@@ -1,0 +1,64 @@
+version: '3.8'
+services:
+  traefik:
+    image: traefik:v3.2
+    command: >
+      --api.dashboard=true
+      --providers.swarm=true
+      --providers.swarm.exposedbydefault=false
+      --entrypoints.web.address=:80
+      --entrypoints.websecure.address=:443
+      --api.insecure=${TRAEFIK_INSECURE:-false}
+      --log.level=DEBUG
+      --ping=true
+      --accesslog=true
+    ports:
+      - published: 80
+        target: 80
+        protocol: tcp
+        mode: host
+      - published: 443
+        target: 443
+        protocol: tcp
+        mode: host
+      - published: 8080
+        target: 8080
+        protocol: tcp
+        mode: host
+    environment:
+      - CF_API_EMAIL=${CF_API_EMAIL}
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certificates:/letsencrypt
+    networks:
+      - traefik-public
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.dashboard.rule=Host(`${TRAEFIK_SUBDOMAIN}.${DOMAIN_NAME}`)"
+        - "traefik.http.routers.dashboard.service=api@internal"
+        - "traefik.http.services.api.loadbalancer.server.port=8080"
+        - "traefik.http.middlewares.dashboardauth.basicauth.users=${BASIC_AUTH_STRING}"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    networks:
+      - traefik-public
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+
+volumes:
+  traefik-certificates:
+
+networks:
+  traefik-public:
+    external: true
