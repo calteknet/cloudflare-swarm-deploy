@@ -1,3 +1,5 @@
+cd public
+cat > index.html << 'EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,7 +13,6 @@
     <div class="container mx-auto px-4 py-8">
         <h1 class="text-3xl font-bold mb-8">Odoo Monitor Dashboard</h1>
         
-        <!-- System Stats -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div class="bg-white rounded-lg shadow p-6">
                 <h2 class="text-xl font-semibold mb-4">Disk Usage</h2>
@@ -27,11 +28,9 @@
             </div>
         </div>
 
-        <!-- Container Stats -->
         <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-xl font-semibold mb-4">Container Statistics</h2>
             <div id="containerStats" class="space-y-4">
-                <!-- Container stats will be injected here -->
             </div>
         </div>
     </div>
@@ -58,3 +57,4 @@
     </script>
 </body>
 </html>
+EOF

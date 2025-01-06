@@ -1,3 +1,5 @@
+cd src
+cat > package.json << 'EOF'
 {
   "name": "odoo-monitor",
   "version": "1.0.0",
@@ -13,3 +15,4 @@
     "socket.io": "^4.0.0"
   }
 }
+EOF

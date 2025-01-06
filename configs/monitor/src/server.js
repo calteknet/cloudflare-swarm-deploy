@@ -1,3 +1,4 @@
+cat > server.js << 'EOF'
 const express = require('express');
 const basicAuth = require('express-basic-auth');
 const { exec } = require('child_process');
@@ -5,16 +6,13 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 
-// Basic authentication
 app.use(basicAuth({
     users: { 'admin': 'your-secure-password' },
     challenge: true
 }));
 
-// Serve static files
 app.use(express.static('public'));
 
-// Get system stats
 const getSystemStats = async () => {
     const execPromise = cmd => new Promise((resolve, reject) => {
         exec(cmd, (error, stdout, stderr) => {
@@ -42,11 +40,9 @@ const getSystemStats = async () => {
     }
 };
 
-// Socket.io connection
 io.on('connection', socket => {
     console.log('Client connected');
     
-    // Send stats every 5 seconds
     const statsInterval = setInterval(async () => {
         const stats = await getSystemStats();
         if (stats) socket.emit('stats', stats);
@@ -58,7 +54,6 @@ io.on('connection', socket => {
     });
 });
 
-// Routes
 app.get('/api/health', async (req, res) => {
     const stats = await getSystemStats();
     res.json(stats);
@@ -67,3 +62,4 @@ app.get('/api/health', async (req, res) => {
 http.listen(3000, () => {
     console.log('Monitor dashboard running on port 3000');
 });
+EOF

@@ -1,0 +1,72 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    command: >
+      postgres 
+      -c max_connections=500
+      -c shared_buffers=1024MB
+      -c work_mem=32MB
+    volumes:
+      - odoo18-db-data:/var/lib/postgresql/data/pgdata
+    networks:
+      odoo-internal:
+        aliases:
+          - postgres
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          memory: ${PG_MEMORY}
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+  odoo7:
+    image: odoo:18.0
+    depends_on:
+      - postgres
+    volumes:
+      - odoo18-web7-data:/var/lib/odoo
+      - odoo7-config:/etc/odoo
+      - odoo-addons:/mnt/extra-addons
+    environment:
+      - HOST=${ODOO_HOST}
+      - PORT=${ODOO_PORT}
+      - USER=${ODOO_USER}
+      - PASSWORD=${ODOO_PASSWORD}
+      - "DB_FILTER=^${DOMAIN1}.*1028856"
+    networks:
+      - traefik-public
+      - odoo-internal
+    deploy:
+      mode: replicated
+      replicas: 1
+      resources:
+        limits:
+          memory: ${ODOO_MEMORY}
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.odoo7.rule=Host(`${DOMAIN1}`)"
+        - "traefik.http.services.odoo7.loadbalancer.server.port=8069"
+
+volumes:
+  odoo18-db-data:
+  odoo18-web7-data:
+  odoo7-config:
+  odoo-addons:
+
+networks:
+  odoo-internal:
+    driver: overlay
+    attachable: true
+    internal: true
+  traefik-public:
+    external: true
