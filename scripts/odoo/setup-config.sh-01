@@ -1,0 +1,97 @@
+#!/bin/bash
+set -e
+
+# Configuration output paths
+OUTPUT_DIR="generated-config"
+mkdir -p $OUTPUT_DIR
+
+# Interactive configuration function
+configure() {
+    echo "=== Odoo Stack Configuration Setup ==="
+    echo
+
+    # Database configuration
+    read -p "PostgreSQL Username [odoo]: " pg_user
+    PG_USER=${pg_user:-odoo}
+    
+    read -s -p "PostgreSQL Password: " pg_pass
+    echo
+    PG_PASS=${pg_pass:-$(openssl rand -base64 12)}
+
+    # Domain configuration
+    read -p "Primary Domain (e.g., odoo.example.com): " domain1
+    read -p "Secondary Domain (e.g., erp.example.com): " domain2
+
+    # Resource limits
+    read -p "PostgreSQL Memory Limit (GB) [4]: " pg_memory
+    PG_MEMORY=${pg_memory:-4}
+
+    read -p "Odoo Instance Memory Limit (GB) [2]: " odoo_memory
+    ODOO_MEMORY=${odoo_memory:-2}
+
+    # Host paths configuration
+    read -p "Create host directories for addons? [Y/n]: " create_dirs
+    if [[ ${create_dirs,,} != "n" ]]; then
+        read -p "Base path for addons [/opt/odoo/addons]: " addons_path
+        ADDONS_PATH=${addons_path:-/opt/odoo/addons}
+        echo "Will create: $ADDONS_PATH"
+    fi
+}
+
+# Generate stack.env
+generate_env() {
+    cat > "$OUTPUT_DIR/stack.env" << EOF
+POSTGRES_USER=$PG_USER
+POSTGRES_PASSWORD=$PG_PASS
+POSTGRES_DB=postgres
+ODOO_HOST=postgres
+ODOO_PORT=5432
+ODOO_USER=$PG_USER
+ODOO_PASSWORD=$PG_PASS
+DOMAIN1=$domain1
+DOMAIN2=$domain2
+PG_MEMORY=${PG_MEMORY}G
+ODOO_MEMORY=${ODOO_MEMORY}G
+EOF
+}
+
+# Generate docker-compose.yml with host paths if needed
+generate_compose() {
+    if [[ -n "$ADDONS_PATH" ]]; then
+        # Generate compose file with host volumes
+        sed "s|odoo-addons:/mnt/extra-addons|$ADDONS_PATH:/mnt/extra-addons|g" \
+            configs/odoo/docker-compose.yml > "$OUTPUT_DIR/docker-compose.yml"
+        
+        # Create setup script for host directories
+        cat > "$OUTPUT_DIR/prepare-host.sh" << EOF
+#!/bin/bash
+set -e
+
+# Create addons directory
+sudo mkdir -p $ADDONS_PATH
+sudo chown -R 101:101 $ADDONS_PATH  # odoo user in container
+
+# Set proper permissions
+sudo chmod 755 $ADDONS_PATH
+EOF
+        chmod +x "$OUTPUT_DIR/prepare-host.sh"
+    else
+        # Use default compose file with named volumes
+        cp configs/odoo/docker-compose.yml "$OUTPUT_DIR/docker-compose.yml"
+    fi
+}
+
+# Main execution
+main() {
+    configure
+    generate_env
+    generate_compose
+
+    echo
+    echo "Configuration generated in $OUTPUT_DIR/"
+    echo "1. If using host directories, run: ./prepare-host.sh"
+    echo "2. Upload generated files to Portainer"
+    echo "3. Deploy stack"
+}
+
+main

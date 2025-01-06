@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Odoo Monitor Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">Odoo Monitor Dashboard</h1>
+        
+        <!-- System Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Disk Usage</h2>
+                <div id="diskUsage" class="text-4xl font-bold text-blue-600">-</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Memory Usage</h2>
+                <div id="memoryUsage" class="text-4xl font-bold text-green-600">-</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Container Count</h2>
+                <div id="containerCount" class="text-4xl font-bold text-purple-600">-</div>
+            </div>
+        </div>
+
+        <!-- Container Stats -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-semibold mb-4">Container Statistics</h2>
+            <div id="containerStats" class="space-y-4">
+                <!-- Container stats will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+
+        socket.on('stats', (stats) => {
+            document.getElementById('diskUsage').textContent = stats.disk;
+            document.getElementById('memoryUsage').textContent = `${stats.memory}%`;
+            document.getElementById('containerCount').textContent = stats.containers.length;
+
+            const containerStats = document.getElementById('containerStats');
+            containerStats.innerHTML = stats.containers.map(container => `
+                <div class="border-b border-gray-200 pb-4">
+                    <h3 class="font-semibold">${container.name}</h3>
+                    <div class="grid grid-cols-2 gap-4 mt-2">
+                        <div>CPU: ${container.cpu}</div>
+                        <div>Memory: ${container.mem}</div>
+                    </div>
+                </div>
+            `).join('');
+        });
+    </script>
+</body>
+</html>
