@@ -1,75 +1,30 @@
-#!/bin/bash
-set -e
+# Monitor Configuration File
 
-# Configuration
-CONFIG_FILE="/etc/odoo/monitor-config.conf"
-ALERT_EMAIL=""
-SLACK_WEBHOOK=""
+# Email Configuration
+ALERT_EMAIL="admin@menlola.net"
+SLACK_WEBHOOK="https://hooks.slack.com/services/YOUR/WEBHOOK/HERE"
 
-# Load configuration
-if [ -f "$CONFIG_FILE" ]; then
-    source "$CONFIG_FILE"
-fi
+# Thresholds
+DISK_THRESHOLD=90
+MEMORY_THRESHOLD=85
+CPU_THRESHOLD=80
 
-# Monitoring metrics
-check_disk_space() {
-    local threshold=90
-    local usage=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')
-    if [ "$usage" -gt "$threshold" ]; then
-        return 1
-    fi
-    return 0
-}
+# Service Names
+STACK_NAME="odoo18"
+SERVICES=(
+    "odoo0"
+    "odoo1"
+    "postgres"
+)
 
-check_backup_status() {
-    local backup_dir="/opt/odoo/backups"
-    find "$backup_dir" -type f -mtime -1 | grep -q .
-    return $?
-}
+# Health Check Configuration
+HEALTH_CHECK_INTERVAL=10
+HEALTH_CHECK_TIMEOUT=5
 
-check_services() {
-    docker stack services odoo | grep -q "0/1"
-    if [ $? -eq 0 ]; then
-        return 1
-    fi
-    return 0
-}
+# Logging
+LOG_FILE="/var/log/odoo-monitor.log"
+LOG_RETENTION_DAYS=7
 
-send_alert() {
-    local message="$1"
-    
-    # Email alert
-    if [ -n "$ALERT_EMAIL" ]; then
-        echo "$message" | mail -s "Odoo Alert" "$ALERT_EMAIL"
-    fi
-    
-    # Slack alert
-    if [ -n "$SLACK_WEBHOOK" ]; then
-        curl -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"$message\"}" "$SLACK_WEBHOOK"
-    fi
-}
-
-# Main monitoring loop
-main() {
-    local status=0
-    
-    if ! check_disk_space; then
-        send_alert "Disk space critical"
-        status=1
-    fi
-    
-    if ! check_backup_status; then
-        send_alert "Backup check failed"
-        status=1
-    fi
-    
-    if ! check_services; then
-        send_alert "Service check failed"
-        status=1
-    fi
-    
-    exit $status
-}
-
-main
+# Backup Configuration
+BACKUP_DIR="/var/backups/odoo"
+BACKUP_RETENTION_DAYS=7
