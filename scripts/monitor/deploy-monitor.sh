@@ -5,6 +5,14 @@ set -e
 STACK_NAME="monitor"
 DOMAIN="menlola.net"
 GRAFANA_PASSWORD=$(openssl rand -base64 12)
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+COMPOSE_FILE="$BASE_DIR/configs/monitor/docker-compose.monitor.yml"
+
+# Check if compose file exists
+if [ ! -f "$COMPOSE_FILE" ]; then
+    echo "Error: Cannot find $COMPOSE_FILE"
+    exit 1
+fi
 
 # Create directories
 sudo mkdir -p /opt/monitor/{prometheus,grafana}
@@ -19,7 +27,7 @@ echo "Generated Grafana admin password: $GRAFANA_PASSWORD"
 echo "Please save this password securely!"
 
 # Deploy stack
-docker stack deploy -c docker-compose.monitor.yml $STACK_NAME
+docker stack deploy -c "$COMPOSE_FILE" $STACK_NAME
 
 # Wait for services to start
 echo "Waiting for services to start..."
