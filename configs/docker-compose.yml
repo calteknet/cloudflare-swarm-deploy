@@ -1,0 +1,25 @@
+version: '3.8'
+services:
+  monitor-dashboard:
+    image: node:18-alpine
+    working_dir: /app
+    command: npm start
+    volumes:
+      - ./src:/app
+    environment:
+      - NODE_ENV=production
+      - ODOO_INSTANCES=menlola.net,ctn.menlola.net
+    networks:
+      - traefik-public
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.monitor.rule=Host(`monitor.${DOMAIN_NAME}`)"
+        - "traefik.http.services.monitor.loadbalancer.server.port=3000"
+      placement:
+        constraints:
+          - node.role == manager
+
+networks:
+  traefik-public:
+    external: true

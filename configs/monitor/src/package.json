@@ -1,0 +1,18 @@
+cd src
+cat > package.json << 'EOF'
+{
+  "name": "odoo-monitor",
+  "version": "1.0.0",
+  "description": "Odoo Monitoring Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "express-basic-auth": "^1.2.0",
+    "node-fetch": "^2.6.1",
+    "socket.io": "^4.0.0"
+  }
+}
+EOF
