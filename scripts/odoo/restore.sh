@@ -1,22 +1,21 @@
 #!/bin/bash
 set -e
 
-# Configuration
-BACKUP_BASE="/opt/odoo/backups"
-RESTORE_POINT=""
+# Load configuration
+source /etc/odoo/monitor-config.conf
 
 # Function to log with timestamp
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
-# Function to select backup to restore
+# Select backup to restore
 select_backup() {
-    local backups=($BACKUP_BASE/*/)
+    local backups=($BACKUP_DIR/*/)
     if [ ${#backups[@]} -eq 0 ]; then
-        log "No backups found in $BACKUP_BASE"
+        log "No backups found in $BACKUP_DIR"
         exit 1
-    }
+    fi
 
     echo "Available backups:"
     select backup in "${backups[@]}"; do
@@ -28,111 +27,67 @@ select_backup() {
     done
 }
 
-# Restore host directories
-restore_host_dirs() {
-    log "Restoring host directories..."
+# Restore database
+restore_database() {
+    log "Restoring database..."
+    docker service scale ${STACK_NAME}_odoo0=0 ${STACK_NAME}_odoo1=0
     
-    if [ -f "$RESTORE_POINT/addons.tar.gz" ]; then
-        log "Restoring addons..."
-        sudo rm -rf /opt/odoo/addons/*
-        sudo tar xzf "$RESTORE_POINT/addons.tar.gz" -C /opt/odoo
-    fi
-
-    if [ -f "$RESTORE_POINT/config.tar.gz" ]; then
-        log "Restoring config..."
-        sudo rm -rf /opt/odoo/config/*
-        sudo tar xzf "$RESTORE_POINT/config.tar.gz" -C /opt/odoo
-    fi
+    docker run --rm \
+        --network odoo-internal \
+        -v "$RESTORE_POINT/db:/backup" \
+        postgres:17 \
+        psql -h postgres -U odoo -f /backup/full_backup.sql
+        
+    log "Database restore completed"
 }
 
-# Restore Docker volumes
+# Restore volumes
 restore_volumes() {
-    log "Restoring Docker volumes..."
-    
-    # List of volumes to restore
-    volumes=(
+    log "Restoring volumes..."
+    local volumes=(
         "odoo18-db-data"
-        "odoo18-web7-data"
-        "odoo18-web8-data"
-        "odoo7-config"
-        "odoo8-config"
-        "odoo-addons"
+        "odoo18-web0-data"
+        "odoo18-web1-data"
+        "odoo0-config"
+        "odoo1-config"
     )
-
+    
     for volume in "${volumes[@]}"; do
-        if [ -f "$RESTORE_POINT/$volume.tar.gz" ]; then
+        if [ -f "$RESTORE_POINT/volumes/$volume.tar.gz" ]; then
             log "Restoring volume: $volume"
             docker volume rm "$volume" || true
             docker volume create "$volume"
             docker run --rm \
-                -v "$volume":/dest \
-                -v "$RESTORE_POINT":/backup \
-                alpine sh -c "cd /dest && tar xzf /backup/$volume.tar.gz"
+                -v "$volume":/data \
+                -v "$RESTORE_POINT/volumes":/backup \
+                alpine:latest \
+                sh -c "cd /data && tar xzf /backup/$volume.tar.gz"
         fi
     done
-}
-
-# Restore PostgreSQL database
-restore_database() {
-    log "Restoring PostgreSQL database..."
-    if [ -f "$RESTORE_POINT/full_backup.sql" ]; then
-        docker run --rm \
-            --network odoo-internal \
-            -e PGPASSWORD="$POSTGRES_PASSWORD" \
-            -v "$RESTORE_POINT":/backup \
-            postgres:17 \
-            psql -h postgres -U odoo -f /backup/full_backup.sql
-    fi
-}
-
-# Verify restore
-verify_restore() {
-    log "Verifying restore..."
-    
-    # Check volume restoration
-    for volume in "${volumes[@]}"; do
-        if ! docker volume inspect "$volume" >/dev/null 2>&1; then
-            log "Error: Volume $volume not restored properly"
-            return 1
-        fi
-    done
-
-    # Check database connection
-    if ! docker exec $(docker ps -q -f name=postgres) pg_isready -U odoo; then
-        log "Error: Database not responding after restore"
-        return 1
-    fi
-
-    return 0
 }
 
 # Main execution
 main() {
     log "Starting restore process..."
-    
     select_backup
     
-    read -p "This will stop the Odoo stack. Continue? [y/N] " confirm
+    read -p "This will stop the Odoo services. Continue? [y/N] " confirm
     if [[ ${confirm,,} != "y" ]]; then
         log "Restore cancelled"
         exit 0
     fi
 
-    # Stop services
-    docker stack rm odoo || true
-    sleep 30  # Wait for services to stop
-
-    restore_host_dirs
-    restore_volumes
     restore_database
+    restore_volumes
     
-    if verify_restore; then
-        log "Restore completed successfully!"
-    else
-        log "Restore completed with errors!"
-        exit 1
-    fi
+    log "Restarting services..."
+    docker service scale ${STACK_NAME}_odoo0=1 ${STACK_NAME}_odoo1=1
+    
+    log "Restore completed"
 }
 
-# Run main function
-main
+# Run main function with error handling
+if ! main; then
+    send_alert "Restore failed - check logs at $LOG_FILE"
+    exit 1
+fi

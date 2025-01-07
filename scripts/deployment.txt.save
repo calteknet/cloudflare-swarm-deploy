@@ -1,0 +1,45 @@
+3. Deployment
+Deploy via Portainer:
+
+Navigate to Portainer dashboard
+Select 'Stacks' → 'Add stack'
+Upload docker-compose.yml and stack.env
+Deploy the stack
+
+4. Post-deployment
+
+Add DNS entries in Cloudflare:
+
+A record for your primary domain
+A record for your secondary domain
+
+
+Configure Cloudflare tunnel:
+
+Add route for primary domain
+Add route for secondary domain
+
+
+
+Maintenance
+Backup
+Backup these volumes regularly:
+
+odoo18-db-data: PostgreSQL data
+odoo18-web7-data: First instance data
+odoo18-web8-data: Second instance data
+odoo7-config: First instance config
+odoo8-config: Second instance config
+odoo-addons: Shared addons
+
+Updates
+
+Update image versions in docker-compose.yml
+Redeploy stack through Portainer
+
+Troubleshooting
+
+Check logs via Portainer dashboard
+Verify volume permissions
+Ensure network connectivity
+Validate Cloudflare tunnel status
