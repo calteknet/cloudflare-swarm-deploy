@@ -5,3 +5,7 @@
 credentials.txt
 **/secrets/
 **/.DS_Store
+*.bak
+scripts/manager_ip.txt
+scripts/manager_token.txt
+scripts/worker_token.txt
