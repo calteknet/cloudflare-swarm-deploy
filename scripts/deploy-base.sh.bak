@@ -30,21 +30,15 @@ check_stack() {
     return 1
 }
 
-# Check if this is the primary manager node
-if ! docker node ls | grep -q "Leader"; then
-    echo "Error: This script must be run on the primary manager node"
-    exit 1
-fi
-
-# Deploy Portainer with replication
+# Deploy Portainer first
 echo "Deploying Portainer..."
 cd ../configs/portainer || exit 1
 docker stack deploy -c docker-compose.yml portainer
 
-# Wait for Portainer to be ready
+# Wait for Portainer to be ready (3 services: agent, portainer, cloudflared)
 check_stack portainer 3
 
-# Deploy Traefik
+# Deploy Traefik through Portainer
 echo "Deploying Traefik..."
 cd ../traefik || exit 1
 docker stack deploy -c docker-compose.yml traefik
@@ -58,7 +52,3 @@ echo "Base deployment complete!"
 echo "Access URLs:"
 echo "Portainer: https://portainer.${DOMAIN_NAME}"
 echo "Traefik Dashboard: https://traefik.${DOMAIN_NAME}"
-
-# Show cluster status
-echo -e "\nCluster Status:"
-docker node ls
